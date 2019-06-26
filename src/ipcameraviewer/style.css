@@ -1,4 +1,29 @@
+.root{
+    -fx-background-color:  #ebebeb;
+}
+
+.button{
+    -fx-background-color: #318CDF; 
+    -fx-text-fill: white;
+}
+
+.button:hover{
+    -fx-background-color: #207BCE; 
+    -fx-text-fill: white;
+}
+
 .list-cell 
 {
   -fx-font: 15pt "Times New Roman";
+}
+.list-cell:filled:selected:focused, .list-cell:filled:selected {
+    -fx-background-color: linear-gradient(#439CEC 0%, #318CDF 25%, #2A84DA 75%, #1B76CF 100%);
+}
+
+.list-cell:even {
+    -fx-background-color: white;
+}
+
+.list-cell:filled:hover {
+    -fx-background-color: linear-gradient(#76CFFF 0%, #64BEFF 25%, #5DB7FD 75%, #4EA9FF 100%);
 }

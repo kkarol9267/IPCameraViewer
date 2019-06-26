@@ -9,7 +9,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import javafx.animation.PauseTransition;
 import javafx.application.Application;
+import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Pos;
@@ -17,6 +19,7 @@ import javafx.scene.Scene;
 import javafx.scene.control.Alert;
 import javafx.scene.control.Alert.AlertType;
 import javafx.scene.control.Button;
+import javafx.scene.control.ButtonType;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.ListCell;
 import javafx.scene.control.ListView;
@@ -32,6 +35,7 @@ import javafx.scene.layout.VBox;
 import javafx.scene.text.Text;
 import javafx.stage.Stage;
 import javafx.util.Callback;
+import javafx.util.Duration;
 
 public class IPCameraViewer extends Application {
 
@@ -102,22 +106,49 @@ public class IPCameraViewer extends Application {
         listView.setOnMouseClicked(new EventHandler<MouseEvent>() {
             @Override
             public void handle(MouseEvent click) {
-                if (click.getClickCount() == 2 && click.getButton() == MouseButton.PRIMARY) {
+                if (click.getClickCount() >= 2 && click.getButton() == MouseButton.PRIMARY) {
                     selectedCam = listView.getSelectionModel().getSelectedItem();
-                    if (selectedCam.isState()) {
-                        try {
-                            showView(selectedCam.getName(), selectedCam.getIp_address());
-                        } catch (FrameGrabber.Exception ex) {
-                            Logger.getLogger(IPCameraViewer.class.getName()).log(Level.SEVERE, null, ex);
+                    new Thread(new Runnable() {
+                        public void run() {
+                            if (selectedCam.isState()) {
+                                try {
+                                    Platform.runLater(() -> {
+                                        Alert alert = new Alert(Alert.AlertType.NONE, "wait for it");
+                                        alert.setResult(ButtonType.OK);
+                                        alert.setTitle("Proszę czekać");
+                                        alert.setHeaderText(null);
+                                        alert.setContentText("Trwa uruchamianie kamery: "+selectedCam.getName());
+                                        PauseTransition delay = new PauseTransition(Duration.seconds(8));
+                                        delay.setOnFinished(e -> alert.close());
+                                        alert.show();
+                                        delay.play();
+                                    });
+                                    showView(selectedCam.getName(), selectedCam.getIp_address());
+                                } catch (FrameGrabber.Exception ex) {
+                                    Logger.getLogger(IPCameraViewer.class.getName()).log(Level.SEVERE, null, ex);
+                                    Platform.runLater(new Runnable() {
+                                        public void run() {
+                                            Alert alert = new Alert(AlertType.WARNING);
+                                            alert.setTitle(selectedCam.getName());
+                                            alert.setHeaderText(null);
+                                            alert.setContentText("Nie udalo sie ustanowic polaczenia z " + selectedCam.getName());
+                                            alert.show();
+                                        }
+                                    });
+                                }
+                            } else {
+                                Platform.runLater(new Runnable() {
+                                    public void run() {
+                                        Alert alert = new Alert(AlertType.WARNING);
+                                        alert.setTitle("Status");
+                                        alert.setHeaderText(null);
+                                        alert.setContentText("Ta kamera jest offline");
+                                        alert.showAndWait();
+                                    }
+                                });
+                            }
                         }
-                    } else {
-                        Alert alert = new Alert(AlertType.WARNING);
-                        alert.setTitle("Status");
-                        alert.setHeaderText(null);
-                        alert.setContentText("Ta kamera jest offline");
-                        alert.showAndWait();
-                    }
-
+                    }).start();
                 }
                 if (click.getButton() == MouseButton.SECONDARY) {
                     selectedCam = listView.getSelectionModel().getSelectedItem();
@@ -131,7 +162,6 @@ public class IPCameraViewer extends Application {
             }
         });
 
-        
         Pane root = new Pane();
         root.getChildren().add(buttonAddCamera);
         root.getChildren().add(name);
@@ -147,7 +177,7 @@ public class IPCameraViewer extends Application {
         primaryStage.show();
     }
 
-    public boolean showView(String name, String ip_address) throws FrameGrabber.Exception {
+    public void showView(String name, String ip_address) throws FrameGrabber.Exception {
         String url = "http://" + ip_address + ":81/videostream.cgi?user=user&pwd=user&dummy=param.mjpg";
         OpenCVFrameGrabber frameGrabber = null;
         try {
@@ -155,12 +185,7 @@ public class IPCameraViewer extends Application {
             frameGrabber.setFormat("mjpeg");
             frameGrabber.start();
         } catch (Exception e) {
-            Alert alert = new Alert(AlertType.WARNING);
-            alert.setTitle(name);
-            alert.setHeaderText(null);
-            alert.setContentText("Nie udalo sie ustanowic polaczenia");
-            alert.showAndWait();
-            return false;
+            throw new FrameGrabber.Exception("blad");
         }
 
         opencv_core.IplImage iPimg = frameGrabber.grab();
@@ -172,7 +197,7 @@ public class IPCameraViewer extends Application {
         }
         frameGrabber.stop();
         canvasFrame.dispose();
-        return true;
+        return;
     }
 
     public void addCamera() {
@@ -185,7 +210,7 @@ public class IPCameraViewer extends Application {
             alert.setTitle("Status");
             alert.setHeaderText(null);
             alert.setContentText("Dodano nową kamerę.");
-            alert.showAndWait();
+            alert.show();
             name.setText("");
             ip_address.setText("");
             listView.getItems().add(camera);
@@ -214,7 +239,7 @@ public class IPCameraViewer extends Application {
         }
         return reachable;
     }
-    
+
     private class CustomListCell extends ListCell<Camera> {
 
         private HBox content;
@@ -262,5 +287,5 @@ public class IPCameraViewer extends Application {
     public static void main(String[] args) {
         launch(args);
     }
-
+    
 }
